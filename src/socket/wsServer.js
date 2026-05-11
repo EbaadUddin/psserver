@@ -74,11 +74,11 @@ const activeSockets = new Map();
 function startWSServer() {
 
     const wss = new WebSocket.Server({
-        port: 12345,
+        port: 7789,
         perMessageDeflate: false // IMPORTANT: reduces memory usage
     });
 
-    console.log("WebSocket Server running on port 12345");
+    console.log("WebSocket Server running on port 7789");
 
     // ----------------------------
     // CONNECTION HANDLER
