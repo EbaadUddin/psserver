@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { startWSServer } = require('./socket/wsServer');
@@ -20,4 +21,5 @@ startWSServer();
 
 app.listen(3000, '0.0.0.0', () => {
     console.log('API running on port 3000');
+    console.log("Bucket:", process.env.R2_BUCKET);
 });

@@ -1,8 +1,26 @@
+const {
+    S3Client,
+    PutObjectCommand
+} = require("@aws-sdk/client-s3");
+
+const {
+    getSignedUrl
+} = require("@aws-sdk/s3-request-presigner");
+
 const express = require('express');
 const router = express.Router();
 const { sendCommand } = require('./controller');
 const { getDeviceTime } = require('../utils/time');
 const deviceManager = require('../socket/deviceManager');
+
+const r2 = new S3Client({
+    region: "auto",
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+    }
+});
 
 // ---------------- ENABLE USER ----------------
 router.post('/enable-user', (req, res) => {
@@ -118,6 +136,58 @@ router.post('/reboot-device', (req, res) => {
             ? "Reboot command sent (device will disconnect)" 
             : result.message
     });
+});
+
+
+// ===============================
+// GET R2 UPLOAD URL
+// ===============================
+router.get('/get-upload-url', async (req, res) => {
+
+    try {
+
+        const { company, fileName } = req.query;
+
+        if (!company || !fileName) {
+            return res.json({
+                success: false,
+                message: "company and fileName required"
+            });
+        }
+
+        // folder structure in R2
+        const key = `${company}/${fileName}`;
+
+        const command = new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET,
+            Key: key,
+            ContentType: "image/png"
+        });
+
+        const uploadUrl = await getSignedUrl(r2, command, {
+            expiresIn: 60 * 5
+        });
+
+        const fileUrl =
+            `${process.env.R2_PUBLIC_URL}/${key}`;
+
+        res.json({
+            success: true,
+            uploadUrl,
+            fileUrl
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+
+    }
+
 });
 
 module.exports = router;
