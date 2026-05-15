@@ -1,15 +1,25 @@
+const express = require('express');
+const router = express.Router();
+
+const multer = require("multer");
+
+const {
+    S3Client,
+    PutObjectCommand
+} = require("@aws-sdk/client-s3");
+
 const {
     getSignedUrl
 } = require("@aws-sdk/s3-request-presigner");
 
-const express = require('express');
-const router = express.Router();
 const { sendCommand } = require('./controller');
 const { getDeviceTime } = require('../utils/time');
 const deviceManager = require('../socket/deviceManager');
-const multer = require("multer");
-const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
+
+// ===============================
+// R2 CLIENT
+// ===============================
 const r2 = new S3Client({
     region: "auto",
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -23,8 +33,10 @@ const upload = multer({
     storage: multer.memoryStorage()
 });
 
+
 // ---------------- ENABLE USER ----------------
 router.post('/enable-user', (req, res) => {
+
     const { sn, enrollid } = req.body;
 
     const result = sendCommand(sn, {
@@ -36,8 +48,10 @@ router.post('/enable-user', (req, res) => {
     res.json(result);
 });
 
+
 // ---------------- DISABLE USER ----------------
 router.post('/disable-user', (req, res) => {
+
     const { sn, enrollid } = req.body;
 
     const result = sendCommand(sn, {
@@ -49,8 +63,10 @@ router.post('/disable-user', (req, res) => {
     res.json(result);
 });
 
+
 // ---------------- SET USER INFO ----------------
 router.post('/set-user', (req, res) => {
+
     const { sn, enrollid, name, backupnum, record, admin } = req.body;
 
     const result = sendCommand(sn, {
@@ -65,8 +81,10 @@ router.post('/set-user', (req, res) => {
     res.json(result);
 });
 
+
 // ---------------- SET TIME ----------------
 router.post('/set-time', (req, res) => {
+
     const { sn } = req.body;
 
     const cloudtime = getDeviceTime();
@@ -82,8 +100,10 @@ router.post('/set-time', (req, res) => {
     });
 });
 
+
 // ---------------- DELETE USER ----------------
 router.post('/delete-user', (req, res) => {
+
     const { sn, enrollid, backupnum } = req.body;
 
     if (!sn || enrollid === undefined) {
@@ -96,13 +116,14 @@ router.post('/delete-user', (req, res) => {
     const result = sendCommand(sn, {
         cmd: "deleteuser",
         enrollid,
-        backupnum: backupnum ?? 13 // default = delete all user data
+        backupnum: backupnum ?? 13
     });
 
     res.json(result);
 });
 
-// ---------------- GET DEVICE USERS ----------------
+
+// ---------------- SYNC USERS ----------------
 router.post('/sync-users', (req, res) => {
 
     const { sn } = req.body;
@@ -114,6 +135,7 @@ router.post('/sync-users', (req, res) => {
 
     res.json(result);
 });
+
 
 // ---------------- REBOOT DEVICE ----------------
 router.post('/reboot-device', (req, res) => {
@@ -133,15 +155,15 @@ router.post('/reboot-device', (req, res) => {
 
     res.json({
         ...result,
-        message: result.success 
-            ? "Reboot command sent (device will disconnect)" 
+        message: result.success
+            ? "Reboot command sent (device will disconnect)"
             : result.message
     });
 });
 
 
 // ===============================
-// UPLOAD IMAGE TO R2 (NEW)
+// UPLOAD IMAGE TO R2
 // ===============================
 router.post('/upload-image', upload.single('image'), async (req, res) => {
 
@@ -163,7 +185,6 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
             });
         }
 
-        // R2 folder structure
         const key = `${company}/${fileName}`;
 
         await r2.send(new PutObjectCommand({
@@ -189,9 +210,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
             success: false,
             message: err.message
         });
-
     }
-
 });
 
 module.exports = router;
