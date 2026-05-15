@@ -12,6 +12,8 @@ const router = express.Router();
 const { sendCommand } = require('./controller');
 const { getDeviceTime } = require('../utils/time');
 const deviceManager = require('../socket/deviceManager');
+const multer = require("multer");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const r2 = new S3Client({
     region: "auto",
@@ -20,6 +22,10 @@ const r2 = new S3Client({
         accessKeyId: process.env.R2_ACCESS_KEY_ID,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
     }
+});
+
+const upload = multer({
+    storage: multer.memoryStorage()
 });
 
 // ---------------- ENABLE USER ----------------
@@ -140,13 +146,20 @@ router.post('/reboot-device', (req, res) => {
 
 
 // ===============================
-// GET R2 UPLOAD URL
+// UPLOAD IMAGE TO R2 (NEW)
 // ===============================
-router.get('/get-upload-url', async (req, res) => {
+router.post('/upload-image', upload.single('image'), async (req, res) => {
 
     try {
 
-        const { company, fileName } = req.query;
+        const { company, fileName } = req.body;
+
+        if (!req.file) {
+            return res.json({
+                success: false,
+                message: "No image file received"
+            });
+        }
 
         if (!company || !fileName) {
             return res.json({
@@ -155,35 +168,31 @@ router.get('/get-upload-url', async (req, res) => {
             });
         }
 
-        // folder structure in R2
+        // R2 folder structure
         const key = `${company}/${fileName}`;
 
-        const command = new PutObjectCommand({
+        await r2.send(new PutObjectCommand({
             Bucket: process.env.R2_BUCKET,
             Key: key,
-            ContentType: "image/png"
-        });
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
+        }));
 
-        const uploadUrl = await getSignedUrl(r2, command, {
-            expiresIn: 60 * 5
-        });
+        const fileUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 
-        const fileUrl =
-            `${process.env.R2_PUBLIC_URL}/${key}`;
-
-        res.json({
+        return res.json({
             success: true,
-            uploadUrl,
+            message: "Image uploaded successfully",
             fileUrl
         });
 
     } catch (err) {
 
-        console.error(err);
+        console.error("Upload error:", err);
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Server error"
+            message: err.message
         });
 
     }
